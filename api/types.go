@@ -33,6 +33,8 @@ const (
 	AccountDetailsTxHistoryLight
 	// AccountDetailsTxHistory - basic + tokens + full tx data, subject to paging
 	AccountDetailsTxHistory
+	// AccountDetailsTxHistory - basic + tokens + full tx data, subject to paging(but does not include balance and nonce)
+	AccountDetailsTxSummary
 )
 
 // ErrUnsupportedXpub is returned when coin type does not support xpub address derivation or provided string is not an xpub

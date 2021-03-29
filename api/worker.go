@@ -671,7 +671,7 @@ func (w *Worker) getEthereumToken(index int, addrDesc, contract bchain.AddressDe
 		validContract = false
 	}
 	// do not read contract balances etc in case of Basic option
-	if details >= AccountDetailsTokenBalances && validContract {
+	if details >= AccountDetailsTokenBalances && details < AccountDetailsTxSummary && validContract {
 		b, err = w.chain.EthereumTypeGetErc20ContractBalance(addrDesc, contract)
 		if err != nil {
 			// return nil, nil, nil, errors.Annotatef(err, "EthereumTypeGetErc20ContractBalance %v %v", addrDesc, c.Contract)
@@ -718,6 +718,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 		ci             *bchain.Erc20Contract
 		n              uint64
 		nonContractTxs int
+		b              *big.Int
 	)
 	// unknown number of results for paging
 	totalResults := -1
@@ -726,9 +727,11 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 		return nil, nil, nil, 0, 0, 0, NewAPIError(fmt.Sprintf("Address not found, %v", err), true)
 	}
 
-	b, err := w.chain.EthereumTypeGetBalance(addrDesc)
-	if err != nil {
-		return nil, nil, nil, 0, 0, 0, errors.Annotatef(err, "EthereumTypeGetBalance %v", addrDesc)
+	if details < AccountDetailsTxSummary {
+		b, err = w.chain.EthereumTypeGetBalance(addrDesc)
+		if err != nil {
+			return nil, nil, nil, 0, 0, 0, errors.Annotatef(err, "EthereumTypeGetBalance %v", addrDesc)
+		}
 	}
 
 	if ca != nil {
@@ -738,9 +741,11 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 		if b != nil {
 			ba.BalanceSat = *b
 		}
-		n, err = w.chain.EthereumTypeGetNonce(addrDesc)
-		if err != nil {
-			return nil, nil, nil, 0, 0, 0, errors.Annotatef(err, "EthereumTypeGetNonce %v", addrDesc)
+		if details < AccountDetailsTxSummary {
+			n, err = w.chain.EthereumTypeGetNonce(addrDesc)
+			if err != nil {
+				return nil, nil, nil, 0, 0, 0, errors.Annotatef(err, "EthereumTypeGetNonce %v", addrDesc)
+			}
 		}
 		var filterDesc bchain.AddressDescriptor
 		if filter.Contract != "" {
