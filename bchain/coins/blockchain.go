@@ -66,6 +66,8 @@ func init() {
 	BlockChainFactories["Zcash Testnet"] = zec.NewZCashRPC
 	BlockChainFactories["BSC"] = bsc.NewEthereumRPC
 	BlockChainFactories["BSC Testnet"] = bsc.NewEthereumRPC
+	BlockChainFactories["HECO"] = eth.NewEthereumRPC
+	BlockChainFactories["HECO Testnet"] = eth.NewEthereumRPC
 	BlockChainFactories["Ethereum"] = eth.NewEthereumRPC
 	BlockChainFactories["Ethereum Classic"] = eth.NewEthereumRPC
 	BlockChainFactories["Ethereum Testnet Ropsten"] = eth.NewEthereumRPC

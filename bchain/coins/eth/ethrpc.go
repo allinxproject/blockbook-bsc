@@ -29,6 +29,10 @@ const (
 	MainNet EthereumNet = 1
 	// TestNet is Ropsten test network
 	TestNet EthereumNet = 3
+	// heco mainnet
+	MainNetHECO EthereumNet = 128
+	// heco testnet
+	TestNetHECO EthereumNet = 256
 )
 
 // Configuration represents json config file
@@ -157,6 +161,14 @@ func (b *EthereumRPC) Initialize() error {
 		b.Network = "livenet"
 		break
 	case TestNet:
+		b.Testnet = true
+		b.Network = "testnet"
+		break
+	case MainNetHECO:
+		b.Testnet = false
+		b.Network = "livenet"
+		break
+	case TestNetHECO:
 		b.Testnet = true
 		b.Network = "testnet"
 		break
@@ -350,7 +362,7 @@ func (b *EthereumRPC) GetChainInfo() (*bchain.ChainInfo, error) {
 		ProtocolVersion: protocol,
 	}
 	idi := int(id.Uint64())
-	if idi == 1 {
+	if idi == int(MainNet) || idi == int(MainNetHECO) {
 		rv.Chain = "mainnet"
 	} else {
 		rv.Chain = "testnet " + strconv.Itoa(idi)
