@@ -2,9 +2,11 @@ package gkc
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/golang/glog"
 	"io"
 	"math/big"
 
@@ -89,6 +91,7 @@ func (p *GKCParser) ParseBlock(b []byte) (*bchain.Block, error) {
 
 	err = DecodeTransactions(r, 0, wire.WitnessEncoding, &w)
 	if err != nil {
+		glog.Infof("block %x", b)
 		return nil, errors.Annotatef(err, "DecodeTransactions")
 	}
 
@@ -268,10 +271,13 @@ func DecodeTransactions(r io.Reader, pver uint32, enc wire.MessageEncoding, blk 
 		return &wire.MessageError{Func: "utils.decodeTransactions", Description: str}
 	}
 
+	fmt.Printf("txCount %d\n", txCount)
 	blk.Transactions = make([]*wire.MsgTx, 0, txCount)
 	for i := uint64(0); i < txCount; i++ {
 		tx := wire.MsgTx{}
-		err := tx.BtcDecode(r, pver, enc)
+		//err := tx.BtcDecode(r, pver, enc)
+		err := BtcDecode(r, pver, enc, &tx)
+		fmt.Printf("tx %+v\n", tx)
 		if err != nil {
 			return err
 		}
@@ -288,4 +294,24 @@ func DecodeTransactions(r io.Reader, pver uint32, enc wire.MessageEncoding, blk 
 	}
 
 	return nil
+}
+
+func readUint32(r io.Reader) (uint32, error) {
+	buf := make([]byte, 4, 4)
+	n, err := r.Read(buf)
+	if err != nil || n != 4 {
+		return 0, fmt.Errorf("can't read uin32")
+	}
+
+	return binary.LittleEndian.Uint32(buf), nil
+}
+
+func readUint64(r io.Reader) (uint64, error) {
+	buf := make([]byte, 8, 8)
+	n, err := r.Read(buf)
+	if err != nil || n != 8 {
+		return 0, fmt.Errorf("can't read uin64")
+	}
+
+	return binary.LittleEndian.Uint64(buf), nil
 }
