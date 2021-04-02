@@ -16,9 +16,9 @@ import (
 // payload + min output payload.
 const minTxPayload = 10
 
-// maxTxPerBlock is the maximum number of transactions that could
+// MaxTxPerBlock is the maximum number of transactions that could
 // possibly fit into a block.
-const maxTxPerBlock = (wire.MaxBlockPayload / minTxPayload) + 1
+const MaxTxPerBlock = (wire.MaxBlockPayload / minTxPayload) + 1
 
 // DecodeTransactions decodes transactions from input stream using wire
 func DecodeTransactions(r io.Reader, pver uint32, enc wire.MessageEncoding, blk *wire.MsgBlock) error {
@@ -30,9 +30,9 @@ func DecodeTransactions(r io.Reader, pver uint32, enc wire.MessageEncoding, blk 
 	// Prevent more transactions than could possibly fit into a block.
 	// It would be possible to cause memory exhaustion and panics without
 	// a sane upper bound on this count.
-	if txCount > maxTxPerBlock {
+	if txCount > MaxTxPerBlock {
 		str := fmt.Sprintf("too many transactions to fit into a block "+
-			"[count %d, max %d]", txCount, maxTxPerBlock)
+			"[count %d, max %d]", txCount, MaxTxPerBlock)
 		return &wire.MessageError{Func: "utils.decodeTransactions", Description: str}
 	}
 
