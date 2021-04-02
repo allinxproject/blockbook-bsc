@@ -492,9 +492,9 @@ func readTxOut(r io.Reader, pver uint32, version int32, to *wire.TxOut) error {
 	}
 
 	// READWRITE(*reinterpret_cast<uint8_t*>(&type));
-	buf := make([]byte, 4, 4)
+	buf := make([]byte, 1, 1)
 	n, err := r.Read(buf)
-	if err != nil || n != 4 {
+	if err != nil || n != 1 {
 		return fmt.Errorf("can't read tx out type")
 	}
 	return nil

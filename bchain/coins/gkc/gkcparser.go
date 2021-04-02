@@ -271,13 +271,10 @@ func DecodeTransactions(r io.Reader, pver uint32, enc wire.MessageEncoding, blk 
 		return &wire.MessageError{Func: "utils.decodeTransactions", Description: str}
 	}
 
-	fmt.Printf("txCount %d\n", txCount)
 	blk.Transactions = make([]*wire.MsgTx, 0, txCount)
 	for i := uint64(0); i < txCount; i++ {
 		tx := wire.MsgTx{}
-		//err := tx.BtcDecode(r, pver, enc)
 		err := BtcDecode(r, pver, enc, &tx)
-		fmt.Printf("tx %+v\n", tx)
 		if err != nil {
 			return err
 		}
