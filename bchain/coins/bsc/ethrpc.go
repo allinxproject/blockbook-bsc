@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/hashicorp/golang-lru"
 	"math/big"
 	"strconv"
 	"sync"
@@ -20,6 +21,8 @@ import (
 	"github.com/trezor/blockbook/bchain"
 	"github.com/trezor/blockbook/common"
 )
+
+var blockTimeCache, _ = lru.New(10240)
 
 // EthereumNet type specifies the type of ethereum network
 type EthereumNet uint32
@@ -686,20 +689,28 @@ func (b *EthereumRPC) GetTransaction(txid string) (*bchain.Tx, error) {
 		}
 	} else {
 		// non mempool tx - read the block header to get the block time
-		raw, err := b.getBlockRaw(tx.BlockHash, 0, false)
-		if err != nil {
-			return nil, err
-		}
-		var ht struct {
-			Time string `json:"timestamp"`
-		}
-		if err := json.Unmarshal(raw, &ht); err != nil {
-			return nil, errors.Annotatef(err, "hash %v", hash)
-		}
 		var time int64
-		if time, err = ethNumber(ht.Time); err != nil {
-			return nil, errors.Annotatef(err, "txid %v", txid)
+		v, ok := blockTimeCache.Get(tx.BlockHash)
+		if ok {
+			time = v.(int64)
+		} else {
+			raw, err := b.getBlockRaw(tx.BlockHash, 0, false)
+			if err != nil {
+				return nil, err
+			}
+			var ht struct {
+				Time string `json:"timestamp"`
+			}
+			if err := json.Unmarshal(raw, &ht); err != nil {
+				return nil, errors.Annotatef(err, "hash %v", hash)
+			}
+			if time, err = ethNumber(ht.Time); err != nil {
+				return nil, errors.Annotatef(err, "txid %v", txid)
+			}
+
+			blockTimeCache.Add(tx.BlockHash, time)
 		}
+
 		var receipt rpcReceipt
 		err = b.rpc.CallContext(ctx, &receipt, "eth_getTransactionReceipt", hash)
 		if err != nil {
