@@ -1,6 +1,7 @@
 package bchain
 
 import (
+	"github.com/hashicorp/golang-lru"
 	"time"
 
 	"github.com/golang/glog"
@@ -12,11 +13,13 @@ type MempoolBscType struct {
 	mempoolTimeoutTime   time.Duration
 	queryBackendOnResync bool
 	nextTimeoutRun       time.Time
+	txDeleteCache        *lru.Cache
 }
 
 // NewMempoolEthereumType creates new mempool handler.
 func NewMempoolBscType(chain BlockChain, mempoolTxTimeoutHours int, queryBackendOnResync bool) *MempoolBscType {
 	mempoolTimeoutTime := time.Duration(mempoolTxTimeoutHours) * time.Hour
+	cache, _ := lru.New(8192)
 	return &MempoolBscType{
 		BaseMempool: BaseMempool{
 			chain:        chain,
@@ -26,6 +29,7 @@ func NewMempoolBscType(chain BlockChain, mempoolTxTimeoutHours int, queryBackend
 		mempoolTimeoutTime:   mempoolTimeoutTime,
 		queryBackendOnResync: queryBackendOnResync,
 		nextTimeoutRun:       time.Now().Add(mempoolTimeoutTime),
+		txDeleteCache:        cache,
 	}
 }
 
@@ -134,6 +138,13 @@ func (m *MempoolBscType) AddTransactionToMempool(txid string) {
 			return
 		}
 		m.mux.Lock()
+		if v, ok := m.txDeleteCache.Get(txid); ok {
+			if glog.V(1) {
+				glog.Infof("AddTransactionToMempool, txid %s, marked delete at %s", txid, v.(time.Time))
+			}
+			m.mux.Unlock()
+			return
+		}
 		m.txEntries[txid] = entry
 		for _, si := range entry.addrIndexes {
 			m.addrDescToTx[si.addrDesc] = append(m.addrDescToTx[si.addrDesc], Outpoint{txid, si.n})
@@ -143,7 +154,7 @@ func (m *MempoolBscType) AddTransactionToMempool(txid string) {
 }
 
 // RemoveTransactionFromMempool removes transaction from mempool
-func (m *MempoolBscType) RemoveTransactionFromMempool(txid string) {
+func (m *MempoolBscType) RemoveTransactionFromMempool(txid string, mark bool) {
 	m.mux.Lock()
 	entry, exists := m.txEntries[txid]
 	if glog.V(1) {
@@ -151,6 +162,8 @@ func (m *MempoolBscType) RemoveTransactionFromMempool(txid string) {
 	}
 	if exists {
 		m.removeEntryFromMempool(txid, entry)
+	} else if mark {
+		m.txDeleteCache.Add(txid, time.Now())
 	}
 	m.mux.Unlock()
 }

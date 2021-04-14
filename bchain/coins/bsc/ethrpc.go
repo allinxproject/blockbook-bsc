@@ -580,7 +580,7 @@ func (b *EthereumRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 		}
 		btxs[i] = *btx
 		if b.mempoolInitialized {
-			b.Mempool.RemoveTransactionFromMempool(tx.Hash)
+			b.Mempool.RemoveTransactionFromMempool(tx.Hash, true)
 		}
 	}
 
@@ -652,7 +652,7 @@ func (b *EthereumRPC) BscTypeGetTokenHub() (*bchain.Tokenhub, error) {
 	return th, nil
 }
 
-func (b *EthereumRPC) EthereumTypeGetReceipt(txid string)(*bchain.TransactionReceipt, error)  {
+func (b *EthereumRPC) EthereumTypeGetReceipt(txid string) (*bchain.TransactionReceipt, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), b.timeout)
 	defer cancel()
 	hash := ethcommon.HexToHash(txid)
@@ -676,7 +676,7 @@ func (b *EthereumRPC) GetTransaction(txid string) (*bchain.Tx, error) {
 		return nil, err
 	} else if tx == nil {
 		if b.mempoolInitialized {
-			b.Mempool.RemoveTransactionFromMempool(txid)
+			b.Mempool.RemoveTransactionFromMempool(txid, false)
 		}
 		return nil, bchain.ErrTxNotFound
 	}
@@ -730,7 +730,7 @@ func (b *EthereumRPC) GetTransaction(txid string) (*bchain.Tx, error) {
 		}
 		// remove tx from mempool if it is there
 		if b.mempoolInitialized {
-			b.Mempool.RemoveTransactionFromMempool(txid)
+			b.Mempool.RemoveTransactionFromMempool(txid, true)
 		}
 	}
 	return btx, nil
