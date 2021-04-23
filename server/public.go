@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net/http"
+	"net/http/pprof"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -34,6 +35,8 @@ const (
 	apiV1
 	apiV2
 )
+
+var ENABLE_PPROF = false
 
 // PublicServer is a handle to public http server
 type PublicServer struct {
@@ -109,6 +112,14 @@ func NewPublicServer(binding string, certFiles string, db *db.RocksDB, chain bch
 	serveMux.HandleFunc(path, s.htmlTemplateHandler(s.explorerIndex))
 	// default API handler
 	serveMux.HandleFunc(path+"api/", s.jsonHandler(s.apiIndex, apiV2))
+
+	if ENABLE_PPROF {
+		serveMux.HandleFunc("/debug/pprof/", pprof.Index)
+		serveMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		serveMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		serveMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		serveMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	}
 
 	return s, nil
 }

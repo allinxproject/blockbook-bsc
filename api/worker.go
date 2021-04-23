@@ -301,13 +301,6 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 	}
 	// for now do not return size, we would have to compute vsize of segwit transactions
 	// size:=len(bchainTx.Hex) / 2
-	var sj json.RawMessage
-	if specificJSON {
-		sj, err = w.chain.GetTransactionSpecific(bchainTx)
-		if err != nil {
-			return nil, err
-		}
-	}
 	// for mempool transaction get first seen time
 	if bchainTx.Confirmations == 0 {
 		bchainTx.Blocktime = int64(w.mempool.GetTransactionTime(bchainTx.Txid))
@@ -327,8 +320,6 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		Rbf:              rbf,
 		Vin:              vins,
 		Vout:             vouts,
-		CoinSpecificData: bchainTx.CoinSpecificData,
-		CoinSpecificJSON: sj,
 		TokenTransfers:   tokens,
 		EthereumSpecific: ethSpecific,
 	}
