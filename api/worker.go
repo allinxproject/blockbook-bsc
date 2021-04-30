@@ -725,6 +725,13 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 		}
 	}
 
+	if details < AccountDetailsTxSummary {
+		n, err = w.chain.EthereumTypeGetNonce(addrDesc)
+		if err != nil {
+			return nil, nil, nil, 0, 0, 0, errors.Annotatef(err, "EthereumTypeGetNonce %v", addrDesc)
+		}
+	}
+
 	if ca != nil {
 		ba = &db.AddrBalance{
 			Txs: uint32(ca.TotalTxs),
@@ -732,12 +739,12 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 		if b != nil {
 			ba.BalanceSat = *b
 		}
-		if details < AccountDetailsTxSummary {
-			n, err = w.chain.EthereumTypeGetNonce(addrDesc)
-			if err != nil {
-				return nil, nil, nil, 0, 0, 0, errors.Annotatef(err, "EthereumTypeGetNonce %v", addrDesc)
-			}
-		}
+		//if details < AccountDetailsTxSummary {
+		//	n, err = w.chain.EthereumTypeGetNonce(addrDesc)
+		//	if err != nil {
+		//		return nil, nil, nil, 0, 0, 0, errors.Annotatef(err, "EthereumTypeGetNonce %v", addrDesc)
+		//	}
+		//}
 		var filterDesc bchain.AddressDescriptor
 		if filter.Contract != "" {
 			filterDesc, err = w.chainParser.GetAddrDescFromAddress(filter.Contract)
@@ -867,7 +874,7 @@ func (w *Worker) getAddrDescAndNormalizeAddress(address string) (bchain.AddressD
 
 // GetAddress computes address value and gets transactions for given address
 func (w *Worker) GetAddress(address string, page int, txsOnPage int, option AccountDetails, filter *AddressFilter) (*Address, error) {
-	glog.Info(option)
+	glog.Infof("GetAddress %s %d %d %d %+v", address, page, txsOnPage, option, filter)
 	start := time.Now()
 	page--
 	if page < 0 {

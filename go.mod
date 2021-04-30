@@ -41,6 +41,7 @@ require (
 	github.com/schancel/cashaddr-converter v0.0.0-20180113210041-0a38f5822f79
 	github.com/tecbot/gorocksdb v0.0.0-20180907100951-214b6b7bc0f0
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
+	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22 // indirect
 )

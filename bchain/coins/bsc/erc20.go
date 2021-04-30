@@ -450,13 +450,13 @@ func (b *EthereumRPC) EthereumTypeGetErc20ContractInfo(contractDesc bchain.Addre
 		} else {
 			nameData, err := b.ethCall(erc20NameSignature, address)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("call %s %s err %s", erc20NameSignature, address, err)
 			}
 			name := parseErc20StringProperty(contractDesc, nameData)
 
 			symbolData, err := b.ethCall(erc20SymbolSignature, address)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("call %s %s err %s", erc20SymbolSignature, address, err)
 			}
 
 			symbol := parseErc20StringProperty(contractDesc, symbolData)
@@ -465,7 +465,7 @@ func (b *EthereumRPC) EthereumTypeGetErc20ContractInfo(contractDesc bchain.Addre
 			if name != "" || symbol != "" {
 				data, err := b.ethCall(erc20DecimalsSignature, address)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("call %s %s err %s", erc20DecimalsSignature, address, err)
 				}
 				contract = &bchain.Erc20Contract{
 					Contract: address,

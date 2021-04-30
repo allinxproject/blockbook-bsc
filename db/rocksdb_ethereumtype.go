@@ -51,6 +51,9 @@ func (d *RocksDB) storeAddressContracts(wb *gorocksdb.WriteBatch, acm map[string
 }
 
 func (d *RocksDB) storeNewERC20Contracts(wb *gorocksdb.WriteBatch, contracts []string) error {
+	// fixme: EthereumTypeGetErc20ContractInfo's err causes panic
+	return nil
+
 	for _, contractAddress := range contracts {
 		addr, err := d.chainParser.GetAddrDescFromAddress(contractAddress)
 		if err != nil {

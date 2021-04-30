@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -39,6 +39,8 @@ type Configuration struct {
 	CoinName                    string `json:"coin_name"`
 	CoinShortcut                string `json:"coin_shortcut"`
 	RPCURL                      string `json:"rpc_url"`
+	RPCURLS                     []string `json:"rpc_urls"`
+	RPCURLWS                    string `json:"rpc_url_ws"`
 	RPCTimeout                  int    `json:"rpc_timeout"`
 	BlockAddressesToKeep        int    `json:"block_addresses_to_keep"`
 	MempoolTxTimeoutHours       int    `json:"mempoolTxTimeoutHours"`
@@ -50,6 +52,8 @@ type EthereumRPC struct {
 	*bchain.BaseChain
 	client               *ethclient.Client
 	rpc                  *rpc.Client
+	wsclient             *ethclient.Client
+	wsrpc                *rpc.Client
 	timeout              time.Duration
 	Parser               *EthereumParser
 	Mempool              *bchain.MempoolBscType
@@ -82,10 +86,21 @@ func NewEthereumRPC(config json.RawMessage, pushHandler func(bchain.Notification
 		return nil, err
 	}
 
+	var wsec *ethclient.Client
+	var wsrc *rpc.Client
+	if c.RPCURLWS != "" {
+		wsrc, wsec, err = openRPC(c.RPCURLWS)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	s := &EthereumRPC{
 		BaseChain:   &bchain.BaseChain{},
 		client:      ec,
 		rpc:         rc,
+		wsclient:    wsec,
+		wsrpc:       wsrc,
 		ChainConfig: &c,
 	}
 
@@ -210,12 +225,18 @@ func (b *EthereumRPC) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOu
 
 func (b *EthereumRPC) subscribeEvents() error {
 	// subscriptions
+
+	wsrpc := b.wsrpc
+	if wsrpc == nil {
+		wsrpc = b.rpc
+	}
+
 	if err := b.subscribe(func() (*rpc.ClientSubscription, error) {
 		// invalidate the previous subscription - it is either the first one or there was an error
 		b.newBlockSubscription = nil
 		ctx, cancel := context.WithTimeout(context.Background(), b.timeout)
 		defer cancel()
-		sub, err := b.rpc.EthSubscribe(ctx, b.chanNewBlock, "newHeads")
+		sub, err := wsrpc.EthSubscribe(ctx, b.chanNewBlock, "newHeads")
 		if err != nil {
 			return nil, errors.Annotatef(err, "EthSubscribe newHeads")
 		}
@@ -231,7 +252,7 @@ func (b *EthereumRPC) subscribeEvents() error {
 		b.newTxSubscription = nil
 		ctx, cancel := context.WithTimeout(context.Background(), b.timeout)
 		defer cancel()
-		sub, err := b.rpc.EthSubscribe(ctx, b.chanNewTx, "newPendingTransactions")
+		sub, err := wsrpc.EthSubscribe(ctx, b.chanNewTx, "newPendingTransactions")
 		if err != nil {
 			return nil, errors.Annotatef(err, "EthSubscribe newPendingTransactions")
 		}
@@ -295,6 +316,9 @@ func (b *EthereumRPC) closeRPC() {
 	if b.rpc != nil {
 		b.rpc.Close()
 	}
+	if b.wsrpc != nil {
+		b.wsrpc.Close()
+	}
 }
 
 func (b *EthereumRPC) reconnectRPC() error {
@@ -306,6 +330,16 @@ func (b *EthereumRPC) reconnectRPC() error {
 	}
 	b.rpc = rc
 	b.client = ec
+
+	if b.ChainConfig.RPCURLWS != "" {
+		wsrc, wsec, err := openRPC(b.ChainConfig.RPCURLWS)
+		if err != nil {
+			return err
+		}
+		b.wsrpc = wsrc
+		b.wsclient = wsec
+	}
+
 	return b.subscribeEvents()
 }
 
