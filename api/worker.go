@@ -1664,8 +1664,78 @@ func (w *Worker) GetFeeStats(bid string) (*FeeStats, error) {
 	}, nil
 }
 
+func (w *Worker) GetBlockBsc(bid string, page int, txsOnPage int) (*Block, error) {
+	start := time.Now()
+	page--
+	if page < 0 {
+		page = 0
+	}
+
+	var bi *bchain.Block
+	var err error
+	height, err := strconv.Atoi(bid)
+	if err == nil {
+		bi, err = w.chain.BscTypeGetBlock("", uint32(height))
+	} else {
+		bi, err = w.chain.BscTypeGetBlock(bid, 0)
+	}
+	if err != nil {
+		return nil, NewAPIError(fmt.Sprintf("Block not found, %v", err), true)
+	}
+
+	txCount := len(bi.Txs)
+	bestheight, _, err := w.db.GetBestBlock()
+	if err != nil {
+		return nil, errors.Annotatef(err, "GetBestBlock")
+	}
+	pg, from, to, page := computePaging(txCount, page, txsOnPage)
+	txs := make([]*Tx, to-from)
+	txi := 0
+	for i := from; i < to; i++ {
+		txs[txi], err = w.GetTransactionFromBchainTx(&bi.Txs[i], int(bi.Height), false, true)
+		if err != nil {
+			return nil, err
+		}
+		txi++
+	}
+	if bi.Prev == "" && bi.Height != 0 {
+		bi.Prev, _ = w.db.GetBlockHash(bi.Height - 1)
+	}
+	if bi.Next == "" && bi.Height != bestheight {
+		bi.Next, _ = w.db.GetBlockHash(bi.Height + 1)
+	}
+	txs = txs[:txi]
+	//bi.Txids = nil
+	glog.Info("GetBlockBsc ", bid, ", page ", page, " finished in ", time.Since(start))
+	return &Block{
+		Paging: pg,
+		BlockInfo: BlockInfo{
+			Hash:          bi.Hash,
+			Prev:          bi.Prev,
+			Next:          bi.Next,
+			Height:        bi.Height,
+			Confirmations: bi.Confirmations,
+			Size:          bi.Size,
+			Time:          bi.Time,
+			//Bits:          bi.Bits, // todo
+			//Difficulty:    string(bi.Difficulty),
+			//MerkleRoot:    bi.MerkleRoot,
+			//Nonce:         string(bi.Nonce),
+			//Txids:         bi.Txids,
+			//Version:       bi.Version,
+		},
+		TxCount:      txCount,
+		Transactions: txs,
+	}, nil
+}
+
 // GetBlock returns paged data about block
-func (w *Worker) GetBlock(bid string, page int, txsOnPage int) (*Block, error) {
+func (w *Worker) GetBlock(bid string, page int, txsOnPage int, noloop bool) (*Block, error) {
+	if noloop && w.chainType == bchain.ChainBscType {
+		// call rpc only once
+		return w.GetBlockBsc(bid, page, txsOnPage)
+	}
+
 	start := time.Now()
 	page--
 	if page < 0 {

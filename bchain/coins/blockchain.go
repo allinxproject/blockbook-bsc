@@ -326,6 +326,11 @@ func (c *blockChainWithMetrics) EthereumTypeGetReceipt(txid string) (receipt *bc
 	return c.b.EthereumTypeGetReceipt(txid)
 }
 
+func (c *blockChainWithMetrics) BscTypeGetBlock(hash string, height uint32) (v *bchain.Block, err error) {
+	defer func(s time.Time) { c.observeRPCLatency("BscTypeGetBlock", s, err) }(time.Now())
+	return c.b.BscTypeGetBlock(hash, height)
+}
+
 func (c *blockChainWithMetrics) BscTypeGetTokenHub()(th *bchain.Tokenhub, err error) {
 	defer func(s time.Time) { c.observeRPCLatency("BscTypeGetTokenHub", s, err) }(time.Now())
 	return c.b.BscTypeGetTokenHub()

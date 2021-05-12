@@ -39,7 +39,6 @@ type Configuration struct {
 	CoinName                    string `json:"coin_name"`
 	CoinShortcut                string `json:"coin_shortcut"`
 	RPCURL                      string `json:"rpc_url"`
-	RPCURLS                     []string `json:"rpc_urls"`
 	RPCURLWS                    string `json:"rpc_url_ws"`
 	RPCTimeout                  int    `json:"rpc_timeout"`
 	BlockAddressesToKeep        int    `json:"block_addresses_to_keep"`
@@ -50,10 +49,12 @@ type Configuration struct {
 // EthereumRPC is an interface to JSON-RPC eth service.
 type EthereumRPC struct {
 	*bchain.BaseChain
+
 	client               *ethclient.Client
 	rpc                  *rpc.Client
 	wsclient             *ethclient.Client
 	wsrpc                *rpc.Client
+
 	timeout              time.Duration
 	Parser               *EthereumParser
 	Mempool              *bchain.MempoolBscType
@@ -202,19 +203,21 @@ func (b *EthereumRPC) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOu
 		return errors.New("Mempool not created")
 	}
 
-	// get initial mempool transactions
-	txs, err := b.GetMempoolTransactions()
-	if err != nil {
-		return err
-	}
-	for _, txid := range txs {
-		b.Mempool.AddTransactionToMempool(txid)
+	if b.wsrpc != nil {
+		// get initial mempool transactions
+		txs, err := b.GetMempoolTransactions()
+		if err != nil {
+			return err
+		}
+		for _, txid := range txs {
+			b.Mempool.AddTransactionToMempool(txid)
+		}
 	}
 
 	b.Mempool.OnNewTxAddr = onNewTxAddr
 	b.Mempool.OnNewTx = onNewTx
 
-	if err = b.subscribeEvents(); err != nil {
+	if err := b.subscribeEvents(); err != nil {
 		return err
 	}
 
@@ -224,12 +227,13 @@ func (b *EthereumRPC) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOu
 }
 
 func (b *EthereumRPC) subscribeEvents() error {
-	// subscriptions
-
-	wsrpc := b.wsrpc
-	if wsrpc == nil {
-		wsrpc = b.rpc
+	// disable ws
+	if b.wsrpc == nil {
+		return nil
 	}
+
+	// subscriptions
+	wsrpc := b.wsrpc
 
 	if err := b.subscribe(func() (*rpc.ClientSubscription, error) {
 		// invalidate the previous subscription - it is either the first one or there was an error
@@ -398,7 +402,31 @@ func (b *EthereumRPC) GetChainInfo() (*bchain.ChainInfo, error) {
 	return rv, nil
 }
 
+func (b *EthereumRPC) getBestHeaderV2() (*ethtypes.Header, error) {
+	b.bestHeaderLock.Lock()
+	defer b.bestHeaderLock.Unlock()
+
+	if b.bestHeaderTime.IsZero() ||
+		b.bestHeaderTime.Add(30*time.Second).Before(time.Now()) {
+
+		var err error
+		ctx, cancel := context.WithTimeout(context.Background(), b.timeout)
+		defer cancel()
+		b.bestHeader, err = b.client.HeaderByNumber(ctx, nil)
+		if err != nil {
+			b.bestHeader = nil
+			return nil, err
+		}
+		b.bestHeaderTime = time.Now()
+	}
+	return b.bestHeader, nil
+}
+
 func (b *EthereumRPC) getBestHeader() (*ethtypes.Header, error) {
+	if b.wsrpc == nil {
+		return b.getBestHeaderV2()
+	}
+
 	b.bestHeaderLock.Lock()
 	defer b.bestHeaderLock.Unlock()
 	// if the best header was not updated for 15 minutes, there could be a subscription problem, reconnect RPC
@@ -569,6 +597,74 @@ func (b *EthereumRPC) getTokenHubEventsForBlock(blockNumber string) (map[string]
 		r[l.Hash] = append(r[l.Hash], &l.rpcLog)
 	}
 	return r, nil
+}
+
+func (b *EthereumRPC) BscTypeGetBlock(hash string, height uint32) (*bchain.Block, error) {
+	raw, err := b.getBlockRaw(hash, height, true)
+	if err != nil {
+		return nil, err
+	}
+	var head rpcHeader
+	if err := json.Unmarshal(raw, &head); err != nil {
+		return nil, errors.Annotatef(err, "hash %v, height %v", hash, height)
+	}
+	var body rpcBlockTransactions
+	if err := json.Unmarshal(raw, &body); err != nil {
+		return nil, errors.Annotatef(err, "hash %v, height %v", hash, height)
+	}
+	bbh, err := b.ethHeaderToBlockHeader(&head)
+	if err != nil {
+		return nil, errors.Annotatef(err, "hash %v, height %v", hash, height)
+	}
+
+	// get ERC20 events
+	logs, err := b.getERC20EventsForBlock(head.Number)
+	if err != nil {
+		return nil, err
+	}
+
+	// get token hub events
+	thLogs, err := b.getTokenHubEventsForBlock(head.Number)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range thLogs {
+		logs[k] = append(logs[k], v...)
+	}
+
+	btxs := make([]bchain.Tx, len(body.Transactions))
+	//ctx, cancel := context.WithTimeout(context.Background(), b.timeout*10)
+	//defer cancel()
+	for i := range body.Transactions {
+		tx := &body.Transactions[i]
+
+		var receipt rpcReceipt
+		//if tx.Payload == "" || tx.Payload == "0x" {
+		//	receipt.Status = "0x1"
+		//	receipt.GasUsed = "0x5208" // always 21000 ?
+		//} else {
+		//	err = b.rpc.CallContext(ctx, &receipt, "eth_getTransactionReceipt", tx.Hash)
+		//	if err != nil {
+		//		return nil, errors.Annotatef(err, "txid %v", tx.Hash)
+		//	}
+		//}
+		receipt.Logs = logs[tx.Hash]
+
+		btx, err := b.Parser.ethTxToTx(tx, &receipt, bbh.Time, uint32(bbh.Confirmations), true)
+		if err != nil {
+			return nil, errors.Annotatef(err, "hash %v, height %v, txid %v", hash, height, tx.Hash)
+		}
+		btxs[i] = *btx
+		if b.mempoolInitialized {
+			b.Mempool.RemoveTransactionFromMempool(tx.Hash, true)
+		}
+	}
+
+	bbk := bchain.Block{
+		BlockHeader: *bbh,
+		Txs:         btxs,
+	}
+	return &bbk, nil
 }
 
 // GetBlock returns block with given hash or height, hash has precedence if both passed

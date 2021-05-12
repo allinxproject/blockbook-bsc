@@ -63,6 +63,10 @@ func (b *BaseChain) EthereumTypeGetReceipt(txid string)(*TransactionReceipt, err
 	return nil, errors.New("Not supported")
 }
 
+func (b *BaseChain) BscTypeGetBlock(hash string, height uint32) (*Block, error) {
+	return nil, errors.New("Not supported")
+}
+
 func (b *BaseChain) BscTypeGetTokenHub() (*Tokenhub, error) {
 	return nil, errors.New("Not supported")
 }

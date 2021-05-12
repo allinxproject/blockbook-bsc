@@ -505,3 +505,18 @@ func (b *EthereumRPC) EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc
 	}
 	return r, nil
 }
+
+//func (b *EthereumRPC) multicall(addrDesc, contractDesc []bchain.AddressDescriptor) (*big.Int, error) {
+//	addr := EIP55Address(addrDesc)
+//	contract := EIP55Address(contractDesc)
+//	req := erc20BalanceOf + "0000000000000000000000000000000000000000000000000000000000000000"[len(addr)-2:] + addr[2:]
+//	data, err := b.ethCall(req, contract)
+//	if err != nil {
+//		return nil, err
+//	}
+//	r := parseErc20NumericProperty(contractDesc, data)
+//	if r == nil {
+//		return nil, errors.New("Invalid balance")
+//	}
+//	return r, nil
+//}

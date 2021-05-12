@@ -764,7 +764,7 @@ func (s *PublicServer) explorerBlock(w http.ResponseWriter, r *http.Request) (tp
 		if ec != nil {
 			page = 0
 		}
-		block, err = s.api.GetBlock(r.URL.Path[i+1:], page, txsOnPage)
+		block, err = s.api.GetBlock(r.URL.Path[i+1:], page, txsOnPage, false)
 		if err != nil {
 			return errorTpl, nil, err
 		}
@@ -802,7 +802,7 @@ func (s *PublicServer) explorerSearch(w http.ResponseWriter, r *http.Request) (t
 			http.Redirect(w, r, joinURL("/xpub/", address.AddrStr), 302)
 			return noTpl, nil, nil
 		}
-		block, err = s.api.GetBlock(q, 0, 1)
+		block, err = s.api.GetBlock(q, 0, 1, false)
 		if err == nil {
 			http.Redirect(w, r, joinURL("/block/", block.Hash), 302)
 			return noTpl, nil, nil
@@ -1177,7 +1177,9 @@ func (s *PublicServer) apiBlock(r *http.Request, apiVersion int) (interface{}, e
 		if ec != nil {
 			page = 0
 		}
-		block, err = s.api.GetBlock(r.URL.Path[i+1:], page, txsInAPI)
+		noloop := strings.ToLower(r.URL.Query().Get("noloop")) == "true"
+
+		block, err = s.api.GetBlock(r.URL.Path[i+1:], page, txsInAPI, noloop)
 		if err == nil && apiVersion == apiV1 {
 			return s.api.BlockToV1(block), nil
 		}

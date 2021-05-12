@@ -289,6 +289,7 @@ type BlockChain interface {
 	EthereumTypeGetReceipt(txid string)(*TransactionReceipt, error)
 	// BSC specific
 	BscTypeGetTokenHub()(*Tokenhub, error)
+	BscTypeGetBlock(hash string, height uint32) (*Block, error)
 }
 
 // BlockChainParser defines common interface to parsing and conversions of block chain data
