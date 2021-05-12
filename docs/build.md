@@ -209,7 +209,7 @@ and compile the static_lib and tools
 ```
 sudo apt-get update && sudo apt-get install -y \
     build-essential git wget pkg-config libzmq3-dev libgflags-dev libsnappy-dev zlib1g-dev libbz2-dev liblz4-dev
-git clone https://github.com/facebook/rocksdb.git
+git clone -b v6.8.1 --depth=1 https://github.com/facebook/rocksdb.git
 cd rocksdb
 CFLAGS=-fPIC CXXFLAGS=-fPIC make release
 ```
@@ -218,7 +218,7 @@ Setup variables for gorocksdb: https://github.com/tecbot/gorocksdb
 
 ```
 export CGO_CFLAGS="-I/path/to/rocksdb/include"
-export CGO_LDFLAGS="-L/path/to/rocksdb -lrocksdb -lstdc++ -lm -lz -lbz2 -lsnappy -llz4"
+export CGO_LDFLAGS="-L/path/to/rocksdb -lrocksdb -lstdc++ -lm -lz -lbz2 -lsnappy -llz4 -ldl"
 ```
 
 Install ZeroMQ: https://github.com/zeromq/libzmq

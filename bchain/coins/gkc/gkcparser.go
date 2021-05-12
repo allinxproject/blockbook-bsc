@@ -7,9 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/golang/glog"
-	"io"
-	"math/big"
-
 	"github.com/juju/errors"
 	"github.com/martinboehm/btcd/blockchain"
 	"github.com/martinboehm/btcd/wire"
@@ -17,6 +14,8 @@ import (
 	"github.com/trezor/blockbook/bchain"
 	"github.com/trezor/blockbook/bchain/coins/btc"
 	"github.com/trezor/blockbook/bchain/coins/utils"
+	"io"
+	"math/big"
 )
 
 // magic numbers
@@ -77,15 +76,15 @@ func GetChainParams(chain string) *chaincfg.Params {
 // ParseBlock parses raw block to our Block struct
 func (p *GKCParser) ParseBlock(b []byte) (*bchain.Block, error) {
 	r := bytes.NewReader(b)
-	w := wire.MsgBlock{}
+	w := MsgBlock{}
 	h := wire.BlockHeader{}
 	err := h.Deserialize(r)
 	if err != nil {
 		return nil, errors.Annotatef(err, "Deserialize")
 	}
 
-	if h.Version > 3 && h.Version < 7 {
-		// Skip past AccumulatorCheckpoint (block version 4, 5 and 6)
+	if h.Version >= BlockVersion_Zerocoin {
+		// Skip past AccumulatorCheckpoint (block version 4, 5 and after)
 		r.Seek(32, io.SeekCurrent)
 	}
 
@@ -121,7 +120,7 @@ func (p *GKCParser) UnpackTx(buf []byte) (*bchain.Tx, uint32, error) {
 
 // ParseTx parses byte array containing transaction and returns Tx struct
 func (p *GKCParser) ParseTx(b []byte) (*bchain.Tx, error) {
-	t := wire.MsgTx{}
+	t := MsgTx{}
 	r := bytes.NewReader(b)
 	if err := t.Deserialize(r); err != nil {
 		return nil, err
@@ -132,12 +131,12 @@ func (p *GKCParser) ParseTx(b []byte) (*bchain.Tx, error) {
 }
 
 // TxFromMsgTx parses tx and adds handling for OP_ZEROCOINSPEND inputs
-func (p *GKCParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) bchain.Tx {
+func (p *GKCParser) TxFromMsgTx(t *MsgTx, parseAddresses bool) bchain.Tx {
 	vin := make([]bchain.Vin, len(t.TxIn))
 	for i, in := range t.TxIn {
 
 		// extra check to not confuse Tx with single OP_ZEROCOINSPEND input as a coinbase Tx
-		if !isZeroCoinSpendScript(in.SignatureScript) && blockchain.IsCoinBaseTx(t) {
+		if !isZeroCoinSpendScript(in.SignatureScript) && blockchain.IsCoinBaseTx(&wire.MsgTx{Version: t.Version, TxIn: t.TxIn}) {
 			vin[i] = bchain.Vin{
 				Coinbase: hex.EncodeToString(in.SignatureScript),
 				Sequence: in.Sequence,
@@ -256,7 +255,7 @@ func isZeroCoinSpendScript(signatureScript []byte) bool {
 }
 
 // this is a fix of utils.DecodeTransactions, just for gkc
-func DecodeTransactions(r io.Reader, pver uint32, enc wire.MessageEncoding, blk *wire.MsgBlock) error {
+func DecodeTransactions(r io.Reader, pver uint32, enc wire.MessageEncoding, blk *MsgBlock) error {
 	txCount, err := wire.ReadVarInt(r, pver)
 	if err != nil {
 		return err
@@ -271,20 +270,12 @@ func DecodeTransactions(r io.Reader, pver uint32, enc wire.MessageEncoding, blk 
 		return &wire.MessageError{Func: "utils.decodeTransactions", Description: str}
 	}
 
-	blk.Transactions = make([]*wire.MsgTx, 0, txCount)
+	blk.Transactions = make([]*MsgTx, 0, txCount)
 	for i := uint64(0); i < txCount; i++ {
-		tx := wire.MsgTx{}
-		err := BtcDecode(r, pver, enc, &tx)
+		tx := MsgTx{}
+		err := tx.BtcDecode(r, pver, enc)
 		if err != nil {
 			return err
-		}
-
-		// gkc
-		// READWRITE(*const_cast<uint32_t*>((uint32_t*)&type));
-		// READWRITE(*const_cast<uint256*>((uint256*)&agentid));
-		buf := make([]byte, 4+32, 4+32)
-		if n, err := r.Read(buf); err != nil || n != 36 {
-			return fmt.Errorf("invalid type or agentid")
 		}
 
 		blk.Transactions = append(blk.Transactions, &tx)
