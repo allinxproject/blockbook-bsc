@@ -33,6 +33,10 @@ const (
 	MainNetHECO EthereumNet = 128
 	// heco testnet
 	TestNetHECO EthereumNet = 256
+	// okchain mainnet
+	MainNetOKChain EthereumNet = 66
+	// okchain testnet
+	TestNetOKChain EthereumNet = 65
 )
 
 // Configuration represents json config file
@@ -40,6 +44,7 @@ type Configuration struct {
 	CoinName                    string `json:"coin_name"`
 	CoinShortcut                string `json:"coin_shortcut"`
 	RPCURL                      string `json:"rpc_url"`
+	RPCURLWS                    string `json:"rpc_url_ws"`
 	RPCTimeout                  int    `json:"rpc_timeout"`
 	BlockAddressesToKeep        int    `json:"block_addresses_to_keep"`
 	MempoolTxTimeoutHours       int    `json:"mempoolTxTimeoutHours"`
@@ -51,6 +56,8 @@ type EthereumRPC struct {
 	*bchain.BaseChain
 	client               *ethclient.Client
 	rpc                  *rpc.Client
+	wsclient             *ethclient.Client
+	wsrpc                *rpc.Client
 	timeout              time.Duration
 	Parser               *EthereumParser
 	Mempool              *bchain.MempoolEthereumType
@@ -88,6 +95,13 @@ func NewEthereumRPC(config json.RawMessage, pushHandler func(bchain.Notification
 		client:      ec,
 		rpc:         rc,
 		ChainConfig: &c,
+	}
+
+	if c.RPCURLWS != "" {
+		s.wsrpc, s.wsclient, err = openRPC(c.RPCURLWS)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// always create parser
@@ -172,6 +186,14 @@ func (b *EthereumRPC) Initialize() error {
 		b.Testnet = true
 		b.Network = "testnet"
 		break
+	case MainNetOKChain:
+		b.Testnet = false
+		b.Network = "livenet"
+		break
+	case TestNetOKChain:
+		b.Testnet = true
+		b.Network = "testnet"
+		break
 	default:
 		return errors.Errorf("Unknown network id %v", id)
 	}
@@ -217,6 +239,10 @@ func (b *EthereumRPC) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOu
 }
 
 func (b *EthereumRPC) subscribeEvents() error {
+	if b.wsrpc == nil {
+		return nil
+	}
+
 	// subscriptions
 	if err := b.subscribe(func() (*rpc.ClientSubscription, error) {
 		// invalidate the previous subscription - it is either the first one or there was an error
@@ -303,6 +329,9 @@ func (b *EthereumRPC) closeRPC() {
 	if b.rpc != nil {
 		b.rpc.Close()
 	}
+	if b.wsrpc != nil {
+		b.wsrpc.Close()
+	}
 }
 
 func (b *EthereumRPC) reconnectRPC() error {
@@ -314,6 +343,16 @@ func (b *EthereumRPC) reconnectRPC() error {
 	}
 	b.rpc = rc
 	b.client = ec
+
+	if b.ChainConfig.RPCURLWS != "" {
+		rc, ec, err = openRPC(b.ChainConfig.RPCURLWS)
+		if err != nil {
+			return err
+		}
+		b.wsrpc = rc
+		b.wsclient = ec
+	}
+
 	return b.subscribeEvents()
 }
 
@@ -362,7 +401,7 @@ func (b *EthereumRPC) GetChainInfo() (*bchain.ChainInfo, error) {
 		ProtocolVersion: protocol,
 	}
 	idi := int(id.Uint64())
-	if idi == int(MainNet) || idi == int(MainNetHECO) {
+	if idi == int(MainNet) || idi == int(MainNetHECO) || idi == int(MainNetOKChain) {
 		rv.Chain = "mainnet"
 	} else {
 		rv.Chain = "testnet " + strconv.Itoa(idi)
@@ -373,6 +412,23 @@ func (b *EthereumRPC) GetChainInfo() (*bchain.ChainInfo, error) {
 func (b *EthereumRPC) getBestHeader() (*ethtypes.Header, error) {
 	b.bestHeaderLock.Lock()
 	defer b.bestHeaderLock.Unlock()
+
+	if b.wsrpc == nil {
+		if b.bestHeaderTime.IsZero() ||
+			b.bestHeaderTime.Add(1*time.Minute).Before(time.Now()) {
+			var err error
+			ctx, cancel := context.WithTimeout(context.Background(), b.timeout)
+			defer cancel()
+			b.bestHeader, err = b.client.HeaderByNumber(ctx, nil)
+			if err != nil {
+				b.bestHeader = nil
+				return nil, err
+			}
+			b.bestHeaderTime = time.Now()
+		}
+		return b.bestHeader, nil
+	}
+
 	// if the best header was not updated for 15 minutes, there could be a subscription problem, reconnect RPC
 	// do it only in case of normal operation, not initial synchronization
 	if b.bestHeaderTime.Add(15*time.Minute).Before(time.Now()) && !b.bestHeaderTime.IsZero() && b.mempoolInitialized {
@@ -416,18 +472,15 @@ func (b *EthereumRPC) GetBestBlockHeight() (uint32, error) {
 
 // GetBlockHash returns hash of block in best-block-chain at given height
 func (b *EthereumRPC) GetBlockHash(height uint32) (string, error) {
-	var n big.Int
-	n.SetUint64(uint64(height))
 	ctx, cancel := context.WithTimeout(context.Background(), b.timeout)
 	defer cancel()
-	h, err := b.client.HeaderByNumber(ctx, &n)
+	var head rpcHeader
+	err := b.rpc.CallContext(ctx, &head, "eth_getBlockByNumber", fmt.Sprintf("%#x", height), false)
 	if err != nil {
-		if err == ethereum.NotFound {
-			return "", bchain.ErrBlockNotFound
-		}
-		return "", errors.Annotatef(err, "height %v", height)
+		return "", err
 	}
-	return h.Hash().Hex(), nil
+
+	return head.Hash, nil
 }
 
 func (b *EthereumRPC) ethHeaderToBlockHeader(h *rpcHeader) (*bchain.BlockHeader, error) {
