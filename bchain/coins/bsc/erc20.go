@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
 	"math/big"
 	"strings"
@@ -33,6 +34,7 @@ var erc20abi = `[{"constant":true,"inputs":[],"name":"name","outputs":[{"name":"
 {"inputs":[{"name":"_initialAmount","type":"uint256"},{"name":"_tokenName","type":"string"},{"name":"_decimalUnits","type":"uint8"},{"name":"_tokenSymbol","type":"string"}],"payable":false,"type":"constructor"},
 {"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_value","type":"uint256"},{"name":"_extraData","type":"bytes"}],"name":"approveAndCall","outputs":[{"name":"success","type":"bool"}],"payable":false,"type":"function","signature":"0xcae9ca51"},
 {"constant":true,"inputs":[],"name":"version","outputs":[{"name":"","type":"string"}],"payable":false,"type":"function","signature":"0x54fd4d50"}]`
+const multicallABI = "[{\"constant\":true,\"inputs\":[],\"name\":\"getCurrentBlockTimestamp\",\"outputs\":[{\"name\":\"timestamp\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"components\":[{\"name\":\"target\",\"type\":\"address\"},{\"name\":\"callData\",\"type\":\"bytes\"}],\"name\":\"calls\",\"type\":\"tuple[]\"}],\"name\":\"aggregate\",\"outputs\":[{\"name\":\"blockNumber\",\"type\":\"uint256\"},{\"name\":\"returnData\",\"type\":\"bytes[]\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getLastBlockHash\",\"outputs\":[{\"name\":\"blockHash\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"getEthBalance\",\"outputs\":[{\"name\":\"balance\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getCurrentBlockDifficulty\",\"outputs\":[{\"name\":\"difficulty\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getCurrentBlockGasLimit\",\"outputs\":[{\"name\":\"gaslimit\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getCurrentBlockCoinbase\",\"outputs\":[{\"name\":\"coinbase\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"blockNumber\",\"type\":\"uint256\"}],\"name\":\"getBlockHash\",\"outputs\":[{\"name\":\"blockHash\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"}]"
 
 // doing the parsing/processing without using go-ethereum/accounts/abi library, it is simple to get data from Transfer event
 const erc20TransferMethodSignature = "0xa9059cbb"
@@ -102,16 +104,16 @@ func GetInternalTransfersFromLog(tx *bchain.Tx, logs []*rpcLog, payload string, 
 						return nil, err
 					}
 					lg := types.Log{
-						Address:     ethcommon.HexToAddress(l.Address),
-						Topics:      topicHash,
-						Data:        hexData,
+						Address: ethcommon.HexToAddress(l.Address),
+						Topics:  topicHash,
+						Data:    hexData,
 					}
 					tis, err := tHub.ParseTransferInSuccess(lg)
 					if err != nil {
 						glog.Errorf("parse tokenhub tx in log failed %v", err)
 						return nil, err
 					}
-					
+
 					syncPackage, err := decodeTransferInSyncPackage(payload)
 					if err != nil {
 						glog.Errorf("decodeTransferInSyncPackage failed: %v", err)
@@ -219,7 +221,6 @@ func decodeTransferInSyncPackage(input string) (*TransferInSynPackage, error) {
 	}
 
 	mmp := make(map[string]interface{})
-	
 
 	method, err := getCrossChainABI().MethodById(data[:4])
 	if err != nil {
@@ -236,7 +237,7 @@ func decodeTransferInSyncPackage(input string) (*TransferInSynPackage, error) {
 	if payloadFromMap == nil {
 		return nil, fmt.Errorf("payload is empty")
 	}
-	
+
 	payload := payloadFromMap.([]byte)
 	if len(payload) < 33 {
 		return nil, fmt.Errorf("payload len(%d) too short", len(payload))
@@ -248,7 +249,7 @@ func decodeTransferInSyncPackage(input string) (*TransferInSynPackage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fail to rlp decode payload %s: %v", payload, err)
 	}
-	
+
 	return &syncPackage, nil
 }
 
@@ -263,7 +264,7 @@ func getCrossChainABI() *abi.ABI {
 		ccAbi, _ := abi.JSON(strings.NewReader(crossChainABI))
 		mCrossChainAbi = &ccAbi
 	})
-	
+
 	return mCrossChainAbi
 }
 
@@ -278,19 +279,19 @@ func getTokenHubABI() *abi.ABI {
 
 type TransferInSynPackage struct {
 	Bep2TokenSymbol [32]byte
-	ContractAddr [20]byte
-	Amount big.Int
-	Recipient [20]byte
-	RefundAddr [20]byte
-	ExpireTime uint64
+	ContractAddr    [20]byte
+	Amount          big.Int
+	Recipient       [20]byte
+	RefundAddr      [20]byte
+	ExpireTime      uint64
 }
 
 //address contractAddr, address recipient, uint256 amount, uint64 expireTime
 type TransferOutSynPackage struct {
 	ContractAddr ethcommon.Address
-	Recipient ethcommon.Address
-	Amount *big.Int
-	ExpireTime uint64
+	Recipient    ethcommon.Address
+	Amount       *big.Int
+	ExpireTime   uint64
 }
 
 func erc20GetTransfersFromLog(logs []*rpcLog) ([]bchain.Erc20Transfer, error) {
@@ -343,7 +344,7 @@ func erc20GetTransfersFromTx(tx *rpcTransaction) ([]bchain.Erc20Transfer, error)
 	return r, nil
 }
 
-func getTokenHubTransferInFromTx(tx *rpcTransaction) ([]bchain.Erc20Transfer, error)  {
+func getTokenHubTransferInFromTx(tx *rpcTransaction) ([]bchain.Erc20Transfer, error) {
 	var r []bchain.Erc20Transfer
 	if len(tx.Payload) == 128+len(erc20TransferMethodSignature) && strings.HasPrefix(tx.Payload, erc20TransferMethodSignature) {
 		to, err := addressFromPaddedHex(tx.Payload[len(erc20TransferMethodSignature) : 64+len(erc20TransferMethodSignature)])
@@ -506,17 +507,75 @@ func (b *EthereumRPC) EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc
 	return r, nil
 }
 
-//func (b *EthereumRPC) multicall(addrDesc, contractDesc []bchain.AddressDescriptor) (*big.Int, error) {
-//	addr := EIP55Address(addrDesc)
-//	contract := EIP55Address(contractDesc)
-//	req := erc20BalanceOf + "0000000000000000000000000000000000000000000000000000000000000000"[len(addr)-2:] + addr[2:]
-//	data, err := b.ethCall(req, contract)
-//	if err != nil {
-//		return nil, err
-//	}
-//	r := parseErc20NumericProperty(contractDesc, data)
-//	if r == nil {
-//		return nil, errors.New("Invalid balance")
-//	}
-//	return r, nil
-//}
+func (b *EthereumRPC) EthereumTypeGetErc20ContractBalanceBatch(addrDesc bchain.AddressDescriptor, contractDescs []bchain.AddressDescriptor) ([]*big.Int, error) {
+	if b.ChainConfig.MulticallContract == "" {
+		var balances []*big.Int
+		for _, contractDesc := range contractDescs {
+			balance, err := b.EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc)
+			if err != nil {
+				return nil, err
+			}
+			balances = append(balances, balance)
+		}
+		return balances, nil
+	}
+
+	addr := EIP55Address(addrDesc)
+
+	type inStruct struct {
+		Target   ethcommon.Address
+		CallData []byte
+	}
+	type outStruct struct{
+		BlockNumber *big.Int
+		ReturnData  [][]byte
+	}
+
+	calls := make([]inStruct, 0, len(contractDescs))
+	for _, contract := range contractDescs {
+		caddr := EIP55Address(contract)
+		data, _ := hex.DecodeString(erc20BalanceOf[2:] + "0000000000000000000000000000000000000000000000000000000000000000"[len(addr)-2:] + addr[2:])
+		calls = append(calls, inStruct{
+			Target:   ethcommon.HexToAddress(caddr),
+			CallData: data,
+		})
+	}
+
+	mcabi, err := abi.JSON(strings.NewReader(multicallABI))
+	if err != nil {
+		return nil, fmt.Errorf("invalid multicall abi, err %v", err)
+	}
+
+	input, err := mcabi.Pack("aggregate", calls)
+	if err != nil {
+		return nil, fmt.Errorf("can't pack, err %v", err)
+	}
+
+	output, err := b.ethCall(fmt.Sprintf("%#x", input), b.ChainConfig.MulticallContract)
+	if err != nil {
+		return nil, fmt.Errorf("can't call, err %v", err)
+	}
+
+	outbytes, err := hexutil.Decode(output)
+	if err != nil {
+		return nil, fmt.Errorf("can't decode call result, err %v", err)
+	}
+
+	var result outStruct
+	err = mcabi.Unpack(&result, "aggregate", outbytes)
+	if err != nil {
+		return nil, fmt.Errorf("can't unpack, err %v", err)
+	}
+
+	if len(result.ReturnData) != len(contractDescs) {
+		return nil, fmt.Errorf("wrong result")
+	}
+
+	var balances []*big.Int
+	for i := range result.ReturnData {
+		balance := parseErc20NumericProperty(contractDescs[i], fmt.Sprintf("%#x", result.ReturnData[i]))
+		balances = append(balances, balance)
+	}
+
+	return balances, nil
+}

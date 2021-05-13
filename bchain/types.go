@@ -286,6 +286,7 @@ type BlockChain interface {
 	EthereumTypeEstimateGas(params map[string]interface{}) (uint64, error)
 	EthereumTypeGetErc20ContractInfo(contractDesc AddressDescriptor) (*Erc20Contract, error)
 	EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc AddressDescriptor) (*big.Int, error)
+	EthereumTypeGetErc20ContractBalanceBatch(addrDesc AddressDescriptor, contractDescs []AddressDescriptor) ([]*big.Int, error)
 	EthereumTypeGetReceipt(txid string)(*TransactionReceipt, error)
 	// BSC specific
 	BscTypeGetTokenHub()(*Tokenhub, error)

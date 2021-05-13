@@ -44,6 +44,7 @@ type Configuration struct {
 	BlockAddressesToKeep        int    `json:"block_addresses_to_keep"`
 	MempoolTxTimeoutHours       int    `json:"mempoolTxTimeoutHours"`
 	QueryBackendOnMempoolResync bool   `json:"queryBackendOnMempoolResync"`
+	MulticallContract           string `json:"multicall_contract"`
 }
 
 // EthereumRPC is an interface to JSON-RPC eth service.

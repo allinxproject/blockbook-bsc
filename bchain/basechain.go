@@ -59,6 +59,10 @@ func (b *BaseChain) EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc A
 	return nil, errors.New("Not supported")
 }
 
+func (b *BaseChain) EthereumTypeGetErc20ContractBalanceBatch(addrDesc AddressDescriptor, contractDescs []AddressDescriptor) ([]*big.Int, error) {
+	return nil, errors.New("Not supported")
+}
+
 func (b *BaseChain) EthereumTypeGetReceipt(txid string)(*TransactionReceipt, error) {
 	return nil, errors.New("Not supported")
 }
