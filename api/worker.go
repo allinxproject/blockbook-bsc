@@ -645,7 +645,7 @@ func computePaging(count, page, itemsOnPage int) (Paging, int, int, int) {
 	}, from, to, page
 }
 
-func (w *Worker) getEthereumToken(index int, addrDesc, contract bchain.AddressDescriptor, details AccountDetails, txs int) (*Token, error) {
+func (w *Worker) getEthereumToken(index int, addrDesc, contract bchain.AddressDescriptor, details AccountDetails, txs int, withBalance bool) (*Token, error) {
 	var b *big.Int
 	validContract := true
 	ci, err := w.chain.EthereumTypeGetErc20ContractInfo(contract)
@@ -662,7 +662,7 @@ func (w *Worker) getEthereumToken(index int, addrDesc, contract bchain.AddressDe
 		validContract = false
 	}
 	// do not read contract balances etc in case of Basic option
-	if details >= AccountDetailsTokenBalances && details < AccountDetailsTxSummary && validContract {
+	if details >= AccountDetailsTokenBalances && details < AccountDetailsTxSummary && validContract && withBalance {
 		b, err = w.chain.EthereumTypeGetErc20ContractBalance(addrDesc, contract)
 		if err != nil {
 			// return nil, nil, nil, errors.Annotatef(err, "EthereumTypeGetErc20ContractBalance %v %v", addrDesc, c.Contract)
@@ -763,17 +763,41 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 					// filter only transactions of this contract
 					filter.Vout = i + 1
 				}
-				t, err := w.getEthereumToken(i+1, addrDesc, c.Contract, details, int(c.Txs))
+				t, err := w.getEthereumToken(i+1, addrDesc, c.Contract, details, int(c.Txs), false)
 				if err != nil {
 					return nil, nil, nil, 0, 0, 0, err
 				}
 				tokens[j] = *t
 				j++
 			}
+
+			// get all balances in 1 rpc call
+			if details >= AccountDetailsTokenBalances && details < AccountDetailsTxSummary {
+				var contractDescs []bchain.AddressDescriptor
+				for _, t := range tokens {
+					desc, err := w.chain.GetChainParser().GetAddrDescFromAddress(t.Contract)
+					if err != nil {
+						return nil, nil, nil, 0, 0, 0, err
+					}
+					contractDescs = append(contractDescs, desc)
+				}
+				start := time.Now()
+				balances, err := w.chain.EthereumTypeGetErc20ContractBalanceBatch(addrDesc, contractDescs)
+				glog.Infof("EthereumTypeGetErc20ContractBalanceBatch, addr %s, time %s", addrDesc, time.Now().Sub(start))
+				if err != nil {
+					// return nil, nil, nil, errors.Annotatef(err, "EthereumTypeGetErc20ContractBalance %v %v", addrDesc, c.Contract)
+					glog.Warningf("EthereumTypeGetErc20ContractBalanceBatch addr %v, err %v", addrDesc, err)
+				} else {
+					for i := range tokens {
+						tokens[i].BalanceSat = (*Amount)(balances[i])
+					}
+				}
+			}
+
 			// special handling if filter has contract
 			// if the address has no transactions with given contract, check the balance, the address may have some balance even without transactions
 			if len(filterDesc) > 0 && j == 0 && details >= AccountDetailsTokens {
-				t, err := w.getEthereumToken(0, addrDesc, filterDesc, details, 0)
+				t, err := w.getEthereumToken(0, addrDesc, filterDesc, details, 0, true)
 				if err != nil {
 					return nil, nil, nil, 0, 0, 0, err
 				}

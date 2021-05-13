@@ -513,9 +513,11 @@ func (b *EthereumRPC) EthereumTypeGetErc20ContractBalanceBatch(addrDesc bchain.A
 		for _, contractDesc := range contractDescs {
 			balance, err := b.EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc)
 			if err != nil {
-				return nil, err
+				glog.Warningf("no balance for %s, contract %s, err %v", addrDesc, contractDesc, err)
+				balances = append(balances, nil)
+			} else {
+				balances = append(balances, balance)
 			}
-			balances = append(balances, balance)
 		}
 		return balances, nil
 	}
