@@ -87,7 +87,7 @@ type Tx struct {
 	Vin         []Vin  `json:"vin"`
 	Vout        []Vout `json:"vout"`
 	BlockHeight uint32 `json:"blockHeight,omitempty"`
-	// BlockHash     string `json:"blockhash,omitempty"`
+	BlockHash   string `json:"blockhash,omitempty"`
 	Confirmations    uint32      `json:"confirmations,omitempty"`
 	Time             int64       `json:"time,omitempty"`
 	Blocktime        int64       `json:"blocktime,omitempty"`

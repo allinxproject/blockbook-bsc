@@ -73,10 +73,12 @@ func (c *TxCache) GetTransaction(txid string) (*bchain.Tx, int, error) {
 					h = tx.BlockHeight
 				} else {
 					// Get the height from the backend's bestblock.
-					h, err = c.chain.GetBestBlockHeight()
+					glog.Infof("query height for tx %s in block %s", txid, tx.BlockHash)
+					header, err := c.chain.GetBlockHeader(tx.BlockHash)
 					if err != nil {
 						return nil, 0, err
 					}
+					h = header.Height
 				}
 			default:
 				h = ta.Height

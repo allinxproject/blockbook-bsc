@@ -777,9 +777,12 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 				for _, t := range tokens {
 					desc, err := w.chain.GetChainParser().GetAddrDescFromAddress(t.Contract)
 					if err != nil {
-						return nil, nil, nil, 0, 0, 0, err
+						//return nil, nil, nil, 0, 0, 0, err
+						glog.Warningf("skip balance of contract %s", t.Contract)
+						contractDescs = append(contractDescs, nil) // as placeholder
+					} else {
+						contractDescs = append(contractDescs, desc)
 					}
-					contractDescs = append(contractDescs, desc)
 				}
 				start := time.Now()
 				balances, err := w.chain.EthereumTypeGetErc20ContractBalanceBatch(addrDesc, contractDescs)

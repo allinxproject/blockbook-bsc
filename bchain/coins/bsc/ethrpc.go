@@ -88,22 +88,18 @@ func NewEthereumRPC(config json.RawMessage, pushHandler func(bchain.Notification
 		return nil, err
 	}
 
-	var wsec *ethclient.Client
-	var wsrc *rpc.Client
-	if c.RPCURLWS != "" {
-		wsrc, wsec, err = openRPC(c.RPCURLWS)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	s := &EthereumRPC{
 		BaseChain:   &bchain.BaseChain{},
 		client:      ec,
 		rpc:         rc,
-		wsclient:    wsec,
-		wsrpc:       wsrc,
 		ChainConfig: &c,
+	}
+
+	if c.RPCURLWS != "" {
+		s.wsrpc, s.wsclient, err = openRPC(c.RPCURLWS)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// always create parser
