@@ -87,7 +87,7 @@ func NewBitcoinRPC(config json.RawMessage, pushHandler func(bchain.NotificationT
 	}
 	// btc supports both calls, other coins overriding BitcoinRPC can change this
 	c.SupportsEstimateFee = true
-	c.SupportsEstimateSmartFee = true
+	c.SupportsEstimateSmartFee = false
 
 	transport := &http.Transport{
 		Dial:                (&net.Dialer{KeepAlive: 600 * time.Second}).Dial,
@@ -803,8 +803,7 @@ func (b *BitcoinRPC) EstimateFee(blocks int) (big.Int, error) {
 	glog.V(1).Info("rpc: estimatefee ", blocks)
 
 	res := ResEstimateFee{}
-	req := CmdEstimateFee{Method: "estimatefee"}
-	req.Params.Blocks = blocks
+	req := map[string]string{"method":"estimatefee"}
 	err := b.Call(&req, &res)
 
 	var r big.Int
