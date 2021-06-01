@@ -56,3 +56,47 @@ func (b *GKCRPC) Initialize() error {
 
 	return nil
 }
+
+// GetChainInfo returns information about the connected backend
+func (b *GKCRPC) GetChainInfo() (*bchain.ChainInfo, error) {
+	glog.V(1).Info("rpc: getblockchaininfo")
+
+	resCi := btc.ResGetBlockChainInfo{}
+	err := b.Call(&btc.CmdGetBlockChainInfo{Method: "getblockchaininfo"}, &resCi)
+	if err != nil {
+		return nil, err
+	}
+	if resCi.Error != nil {
+		return nil, resCi.Error
+	}
+
+	//glog.V(1).Info("rpc: getnetworkinfo")
+	resNi := btc.ResGetNetworkInfo{}
+	//err = b.Call(&btc.CmdGetNetworkInfo{Method: "getnetworkinfo"}, &resNi)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if resNi.Error != nil {
+	//	return nil, resNi.Error
+	//}
+
+	rv := &bchain.ChainInfo{
+		Bestblockhash: resCi.Result.Bestblockhash,
+		Blocks:        resCi.Result.Blocks,
+		Chain:         resCi.Result.Chain,
+		Difficulty:    string(resCi.Result.Difficulty),
+		Headers:       resCi.Result.Headers,
+		SizeOnDisk:    resCi.Result.SizeOnDisk,
+		Subversion:    string(resNi.Result.Subversion),
+		Timeoffset:    resNi.Result.Timeoffset,
+	}
+	rv.Version = string(resNi.Result.Version)
+	rv.ProtocolVersion = string(resNi.Result.ProtocolVersion)
+	if len(resCi.Result.Warnings) > 0 {
+		rv.Warnings = resCi.Result.Warnings + " "
+	}
+	if resCi.Result.Warnings != resNi.Result.Warnings {
+		rv.Warnings += resNi.Result.Warnings
+	}
+	return rv, nil
+}

@@ -894,6 +894,7 @@ func (b *BitcoinRPC) Call(req interface{}, res interface{}) error {
 	if err != nil {
 		return err
 	}
+	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.SetBasicAuth(b.user, b.password)
 	httpRes, err := b.client.Do(httpReq)
 	// in some cases the httpRes can contain data even if it returns error
