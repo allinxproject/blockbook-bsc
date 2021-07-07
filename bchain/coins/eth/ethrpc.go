@@ -28,15 +28,12 @@ const (
 	// MainNet is production network
 	MainNet EthereumNet = 1
 	// TestNet is Ropsten test network
-	TestNet EthereumNet = 3
-	// heco mainnet
-	MainNetHECO EthereumNet = 128
-	// heco testnet
-	TestNetHECO EthereumNet = 256
-	// okchain mainnet
+	TestNet        EthereumNet = 3
+	MainNetHECO    EthereumNet = 128
+	TestNetHECO    EthereumNet = 256
 	MainNetOKChain EthereumNet = 66
-	// okchain testnet
 	TestNetOKChain EthereumNet = 65
+	MainNetMatic   EthereumNet = 137
 )
 
 // Configuration represents json config file
@@ -195,6 +192,10 @@ func (b *EthereumRPC) Initialize() error {
 		b.Testnet = true
 		b.Network = "testnet"
 		break
+	case MainNetMatic:
+		b.Testnet = false
+		b.Network = "livenet"
+		break
 	default:
 		return errors.Errorf("Unknown network id %v", id)
 	}
@@ -250,7 +251,7 @@ func (b *EthereumRPC) subscribeEvents() error {
 		b.newBlockSubscription = nil
 		ctx, cancel := context.WithTimeout(context.Background(), b.timeout)
 		defer cancel()
-		sub, err := b.rpc.EthSubscribe(ctx, b.chanNewBlock, "newHeads")
+		sub, err := b.wsrpc.EthSubscribe(ctx, b.chanNewBlock, "newHeads")
 		if err != nil {
 			return nil, errors.Annotatef(err, "EthSubscribe newHeads")
 		}
@@ -266,7 +267,7 @@ func (b *EthereumRPC) subscribeEvents() error {
 		b.newTxSubscription = nil
 		ctx, cancel := context.WithTimeout(context.Background(), b.timeout)
 		defer cancel()
-		sub, err := b.rpc.EthSubscribe(ctx, b.chanNewTx, "newPendingTransactions")
+		sub, err := b.wsrpc.EthSubscribe(ctx, b.chanNewTx, "newPendingTransactions")
 		if err != nil {
 			return nil, errors.Annotatef(err, "EthSubscribe newPendingTransactions")
 		}
@@ -388,12 +389,12 @@ func (b *EthereumRPC) GetChainInfo() (*bchain.ChainInfo, error) {
 		return nil, err
 	}
 	var ver, protocol string
-	if err := b.rpc.CallContext(ctx, &ver, "web3_clientVersion"); err != nil {
-		return nil, err
-	}
-	if err := b.rpc.CallContext(ctx, &protocol, "eth_protocolVersion"); err != nil {
-		return nil, err
-	}
+	//if err := b.rpc.CallContext(ctx, &ver, "web3_clientVersion"); err != nil {
+	//	return nil, err
+	//}
+	//if err := b.rpc.CallContext(ctx, &protocol, "eth_protocolVersion"); err != nil {
+	//	return nil, err
+	//}
 	rv := &bchain.ChainInfo{
 		Blocks:          int(h.Number.Int64()),
 		Bestblockhash:   h.Hash().Hex(),
@@ -402,7 +403,7 @@ func (b *EthereumRPC) GetChainInfo() (*bchain.ChainInfo, error) {
 		ProtocolVersion: protocol,
 	}
 	idi := int(id.Uint64())
-	if idi == int(MainNet) || idi == int(MainNetHECO) || idi == int(MainNetOKChain) {
+	if idi == int(MainNet) || idi == int(MainNetHECO) || idi == int(MainNetOKChain) || idi == int(MainNetMatic) {
 		rv.Chain = "mainnet"
 	} else {
 		rv.Chain = "testnet " + strconv.Itoa(idi)

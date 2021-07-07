@@ -70,6 +70,7 @@ func init() {
 	BlockChainFactories["BSC"] = bsc.NewEthereumRPC
 	BlockChainFactories["BSC Testnet"] = bsc.NewEthereumRPC
 	BlockChainFactories["HECO"] = eth.NewEthereumRPC
+	BlockChainFactories["Matic"] = eth.NewEthereumRPC
 	BlockChainFactories["HECO Testnet"] = eth.NewEthereumRPC
 	BlockChainFactories["OKChain"] = eth.NewEthereumRPC
 	BlockChainFactories["OKChain Testnet"] = eth.NewEthereumRPC
